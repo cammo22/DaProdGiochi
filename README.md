@@ -18,6 +18,7 @@ Gira sul tuo computer: niente account, niente chiavi API, codice aperto.
 ![locale](https://img.shields.io/badge/100%25-locale-5cff9d)
 ![android](https://img.shields.io/badge/telefono-Android%208%2B-5cff9d)
 ![discord](https://img.shields.io/badge/discord-presto-lightgrey)
+[![Discord](https://img.shields.io/badge/Discord-DaProd-5865F2?logo=discord&logoColor=white)](https://discord.gg/Njs52aacwq)
 
 **[⬇ Scarica per Windows](https://github.com/cammo22/DaProdSuite/releases/latest)** ·
 **[📱 L'app per il telefono](https://github.com/cammo22/DaProdSuite/releases/latest)** ·
