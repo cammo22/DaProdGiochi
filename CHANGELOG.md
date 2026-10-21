@@ -10,7 +10,7 @@ stanno in [docs/RIPRENDERE-DA-QUI.md](docs/RIPRENDERE-DA-QUI.md).
 
 ---
 
-## Non ancora pubblicato
+## 1.7.10 — Ti avvisa ogni 4 ore quando c'è una versione nuova
 
 - **Il controllo aggiornamenti non si ferma all'avvio.** La suite guarda le release di GitHub quando si apre e poi ogni
   4 ore finché resta aperta, senza bloccare niente (se sei offline sta zitta e riprova al giro dopo). Se sta già
