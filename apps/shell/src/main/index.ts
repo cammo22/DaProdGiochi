@@ -187,6 +187,8 @@ async function start(): Promise<void> {
   // Controllo silenzioso all'avvio: se c'è una versione nuova l'hub la mostra,
   // ma non scarica niente senza che l'utente lo chieda.
   void updater.check();
+  // poi ogni 4 ore, senza bloccare niente: il badge «Aggiornamento X disponibile» si accende da solo
+  updater.startPeriodicCheck();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createHub();

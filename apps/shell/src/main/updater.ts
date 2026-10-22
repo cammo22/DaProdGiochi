@@ -97,6 +97,25 @@ class Updater extends EventEmitter {
     }
   }
 
+  /**
+   * Controllo non bloccante: uno subito (se serve) e poi ogni 4 ore finché la suite resta aperta.
+   * Non disturba chi sta già scaricando o ha già la versione pronta, e tollera la rete che non c'è
+   * (l'errore finisce nello stato, la barra lo mostra; al giro dopo si riprova da soli).
+   */
+  startPeriodicCheck(everyMs = 4 * 3600_000): void {
+    if (this.timer) return;
+    const busy = (): boolean =>
+      this.state.status === "in-controllo" ||
+      this.state.status === "in-scaricamento" ||
+      this.state.status === "pronto-da-installare";
+    this.timer = setInterval(() => {
+      if (!busy()) void this.check();
+    }, everyMs);
+    this.timer.unref?.();
+  }
+
+  private timer: NodeJS.Timeout | null = null;
+
   /** Riavvia applicando l'aggiornamento. Da chiamare solo a servizi già spenti. */
   installAndRestart(): void {
     if (this.state.status !== "pronto-da-installare") return;

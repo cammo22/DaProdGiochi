@@ -353,7 +353,7 @@ function aggiornaBarraAggiornamenti(stato: UpdateState): void {
       break;
 
     case "disponibile":
-      statoAgg.textContent = `Disponibile la versione ${stato.availableVersion}`;
+      statoAgg.textContent = `Aggiornamento ${stato.availableVersion} disponibile`;
       statoAgg.classList.add("novita");
       mostraBottone("Scarica", () => api.update.download());
       break;
