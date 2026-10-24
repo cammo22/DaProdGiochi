@@ -21,10 +21,10 @@ include_dir = "0.7"
 mime_guess = "2"
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 directories = "6"
-tauri = { version = "2", optional = true }
+tauri = { version = "2", optional = true , features = [] }
 
 [build-dependencies]
-tauri-build = { version = "2", optional = true }
+tauri-build = { version = "2", optional = true , features = [] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

@@ -10,3 +10,4 @@ apps/mobile/build/
 .env
 .DS_Store
 test-output/
+apps/desktop/gen/
