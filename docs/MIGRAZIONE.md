@@ -2,6 +2,13 @@
 
 ## Prima del passaggio
 
+La release Windows comprende anche `latest.yml`: serve alla vecchia Suite
+Electron per trovare e scaricare il nuovo installer. Il passaggio a Tauri apre
+l'installer di DaProdGiochi: completalo e poi usa il collegamento DaProdGiochi,
+non quello della Suite precedente. Non viene cancellata la cartella dati della
+Suite. Per installare alla chiusura senza finestra, avvia poi DaProdGiochi dal
+suo nuovo collegamento.
+
 Chiudi DaProdSuite. Copia la sua cartella dati, normalmente
 `%LOCALAPPDATA%\DaProdSuite`, su un altro disco. La nuova applicazione non
 cancella foto, musica, modelli o vecchi archivi presenti sul PC: elimina quei
