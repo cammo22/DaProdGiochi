@@ -7,9 +7,10 @@ signer, aapt, old, new = sys.argv[1:]
 
 def certificate(apk):
     result = subprocess.check_output([signer, 'verify', '--print-certs', apk], text=True)
-    match = re.search(r'Signer #1 certificate SHA-256 digest: ([0-9a-f]+)', result)
-    assert match, 'Certificato APK non trovato'
-    return match.group(1)
+    # I tool recenti riportano il range SDK al posto del vecchio prefisso #1.
+    digests = re.findall(r'certificate SHA-256 digest:\s*([0-9a-fA-F]{64})', result)
+    assert digests, f'Certificato APK non trovato:\n{result}'
+    return {digest.lower() for digest in digests}
 
 def identity(apk):
     result = subprocess.check_output([aapt, 'dump', 'badging', apk], text=True)
