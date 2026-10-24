@@ -8,7 +8,7 @@ let token=sessionStorage.getItem('daprod-token')||'',state=null,view='sala',game
 let fragment=new URLSearchParams(location.hash.slice(1));
 if(fragment.has('token')){token=fragment.get('token');sessionStorage.setItem('daprod-token',token);history.replaceState(null,'',location.pathname);}
 let invite=fragment.get('invite');
-let saved=Object.create(null),revision=0,saveTimer,saveDirty=false,saving=false,saveConflict=false;
+let saved=Object.create(null),revision=0,saveTimer,saveDirty=false,saving=false,saveConflict=false,gameReady=false,cashoutPending=false;
 function toast(s,error=false){$('toast').textContent=s;$('toast').classList.toggle('error',error);$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 async function api(path,body){let r;try{r=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{'Authorization':'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(12000)});}catch{if(body&&['action','save'].includes(path)){try{r=await fetch('/api/'+path,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(12000)});}catch{throw Error('Risposta non ricevuta. Controlla il registro prima di ripetere un pagamento. Il conto è sul PC.');}}else throw Error('Il PC non risponde. Controlla che la sala e Tailscale siano accesi. Il conto non viene cancellato.');}const v=await r.json();if(!r.ok)throw Error(v.error||'Operazione non riuscita');return v;}
 async function act(action,data={}){return api('action',{...data,action,request:crypto.randomUUID?crypto.randomUUID():uuid()});}
@@ -50,28 +50,29 @@ window.addEventListener('message',e=>{
  saveDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(()=>flushSave().catch(()=>{}),1200);
 });
 setInterval(()=>{if(saveDirty)flushSave().catch(()=>{});},10000);
-async function openGame(id){const g=games.find(g=>g.id===id);if(!g)return;const r=await act('open',{game:id});game=id;session=r.session;raw=0;saved=Object.assign(Object.create(null),r.saved);revision=r.revision;saveDirty=false;saveConflict=false;
+async function openGame(id){const g=games.find(g=>g.id===id);if(!g)return;const r=await act('open',{game:id});game=id;session=r.session;raw=0;gameReady=false;cashoutPending=false;$('refill').disabled=true;$('cashout').disabled=true;saved=Object.assign(Object.create(null),r.saved);revision=r.revision;saveDirty=false;saveConflict=false;
 const prefix='dpg:'+state.me.id+':';for(const key of Object.keys(localStorage)){if(key.startsWith(prefix)&&saveKey(key.slice(prefix.length),id))localStorage.removeItem(key);}
 for(const [key,value] of Object.entries(saved))localStorage.setItem(prefix+key,value);$('game-name').textContent=g.name;$('play').hidden=false;$('game-frame').src='/games/'+id+'/index.html?suite=1&player='+encodeURIComponent(state.me.id);}
 function send(message){$('game-frame').contentWindow?.postMessage({daprod:'lira',...message},location.origin);}
 function gameState(){return {modo:'suite',saldo:state.me.balance,valuta:'lire',cassa:{messo:0},partita:0,lirePerEuro:1936.27,fettaDaProd:.1};}
-function refill(){amountForm('Qualche moneta in più?',`Quante lire simulate vuoi spostare dal portafoglio al gioco? Disponibili: ${money(state.me.balance)}.`,async n=>{if(!game)return;const r=await act('topup',{game,session,amount:n});send({ricarica:true,lire:r.lire});toast('Ricarica completata.');},'9681','1');}
+function refill(){if(!gameReady||cashoutPending){toast('Attendi che il gioco sia pronto.');return;}amountForm('Qualche moneta in più?',`Quante lire simulate vuoi spostare dal portafoglio al gioco? Disponibili: ${money(state.me.balance)}.`,async n=>{if(!game)return;const r=await act('topup',{game,session,amount:n});send({ricarica:true,lire:r.lire});toast('Ricarica completata.');},'9681','1');}
 let bridgeQueue=Promise.resolve();
 window.addEventListener('message',event=>{
  if(!game||event.source!==$('game-frame').contentWindow||event.origin!==location.origin||event.data?.daprod!=='lira')return;
  const m=event.data,d=m.dati||{};if(d.gioco&&d.gioco!==game)return;
  bridgeQueue=bridgeQueue.then(async()=>{try{
  let result={ok:true};
- if(m.cosa==='ciao'){result=gameState();}
+ if(cashoutPending&&!['ciao','nelGioco','punti','evento'].includes(m.cosa))throw Error('Attendi il riavvio della partita.');
+ if(m.cosa==='ciao'){gameReady=true;if(!cashoutPending){$('refill').disabled=false;$('cashout').disabled=false;}result=gameState();}
  else if(m.cosa==='nelGioco'){raw=Number(d.lire);if(!Number.isFinite(raw)||raw<0)throw Error('Punteggio non valido');const estimate=await act('estimate',{game,session,raw});send({stima:estimate});$('estimate').textContent='Incasso stimato '+money(estimate.netto);}
  else if(m.cosa==='ricarica'){refill();}
- else if(m.cosa==='paga'){if(!confirm(`${d.cosa||'Potenziamento'}: ${money(d.lire)} dal portafoglio simulato. Confermi?`))throw Error('Annullato');result=await act('pay',{game,session,amount:d.lire});await refresh();}
+ else if(m.cosa==='paga'){if(!confirm(`${d.cosa||'Potenziamento'}: ${money(d.lire)} dal portafoglio simulato. Confermi?`))throw Error('Annullato');result=await act('pay',{game,session,amount:d.lire});refresh().catch(e=>toast(e.message,true));}
  else if(m.cosa==='incassa'){
   const estimate=await act('estimate',{game,session,raw:d.grezzo,finished:!!d.fine});
   if(!confirm(`Richiedi ${money(estimate.netto)}? Il gioco ricomincia e l’incasso attende l’approvazione del proprietario.`))throw Error('Annullato');
-  result=await act('cashout',{game,session,raw:d.grezzo,finished:!!d.fine});toast('Incasso inviato al proprietario.');await refresh();
+  result=await act('cashout',{game,session,raw:d.grezzo,finished:!!d.fine});cashoutPending=true;$('refill').disabled=true;$('cashout').disabled=true;toast('Incasso inviato al proprietario.');refresh().catch(e=>toast(e.message,true));
   // Il gioco esegue il proprio reset prima di aprire la prossima sessione.
-  send({n:m.n,esito:result,stato:gameState()});const next=await act('open',{game});session=next.session;return;
+  send({n:m.n,esito:result,stato:gameState()});try{const next=await act('open',{game});session=next.session;}catch(e){toast('Incasso registrato. Torna alla sala e riapri il gioco: '+e.message,true);}setTimeout(()=>{cashoutPending=false;$('refill').disabled=!gameReady;$('cashout').disabled=!gameReady;},3500);return;
  }else if(!['punti','evento'].includes(m.cosa)){throw Error('Questa azione apparteneva alla vecchia suite.');}
  send({n:m.n,esito:result,stato:gameState()});
  }catch(e){send({n:m.n,errore:e.message});toast(e.message,true);}});
@@ -106,7 +107,7 @@ document.addEventListener('click',async e=>{
  if(b.dataset.spin){document.querySelectorAll('[data-spin]').forEach(x=>x.disabled=true);try{const r=await act('slot',{amount:Number(b.dataset.spin)});$('slot-result').textContent=r.multiplier?'★ ★ ★':'◈ ○ △';toast(r.netto?'Hai vinto '+money(r.netto):'Questa volta niente premio.');await refresh();}finally{document.querySelectorAll('[data-spin]').forEach(x=>x.disabled=false);}}
  }catch(e){toast(e.message,true);}
 });
-$('leave').onclick=async()=>{if(!confirm('Tornare alla sala? La partita rimane aperta e i progressi vengono salvati sul PC.'))return;try{await flushSave();}catch{return;}if(saving){toast('Attendi il salvataggio sul PC.');return;}$('play').hidden=true;$('game-frame').src='about:blank';game=null;session=null;refresh().catch(e=>toast(e.message,true));};
+$('leave').onclick=async()=>{if(cashoutPending){toast('Attendi il riavvio della partita.');return;}await bridgeQueue;if(!confirm('Tornare alla sala? La partita rimane aperta e i progressi vengono salvati sul PC.'))return;try{await flushSave();}catch{return;}if(saving){toast('Attendi il salvataggio sul PC.');return;}$('play').hidden=true;$('game-frame').src='about:blank';game=null;session=null;refresh().catch(e=>toast(e.message,true));};
 $('refill').onclick=refill;$('cashout').onclick=()=>send({incassa:true});
 $('logout').onclick=()=>{sessionStorage.removeItem('daprod-token');token='';location.reload();};
 $('join').onsubmit=async e=>{e.preventDefault();$('join-button').disabled=true;try{const r=await api('pair',{code:invite,name:$('name').value});token=r.token;sessionStorage.setItem('daprod-token',token);invite=null;history.replaceState(null,'',location.pathname);await refresh();}catch(e){toast(e.message,true);}finally{$('join-button').disabled=false;}};

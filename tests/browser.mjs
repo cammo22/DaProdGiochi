@@ -39,7 +39,9 @@ try{
   const frame=await (await page.locator('#game-frame').elementHandle()).contentFrame();
   await frame.waitForFunction(key=>Boolean(window[key]),global,{timeout:45000});
   await frame.waitForFunction(()=>window.DaProdLira?.stato()?.modo==='suite');
+  const before=await frame.evaluate(k=>k==='NP'?window.NP.S.lire:window[k].stato[k==='DOZER'?'saldo':'lire'],global);
   await page.locator('#refill').click();await page.locator('#amount').fill('1936');await page.locator('#amount-form button').click();await page.locator('#dialog').waitFor({state:'hidden'});
+  await frame.waitForFunction(({key,before})=>(key==='NP'?window.NP.S.lire:window[key].stato[key==='DOZER'?'saldo':'lire'])>=before+1936,{key:global,before});
   await page.waitForTimeout(1800);
   await page.screenshot({path:`test-output/${id}.png`});
   await page.locator('#leave').click();await page.locator('#play').waitFor({state:'hidden'});
