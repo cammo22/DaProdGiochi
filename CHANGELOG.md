@@ -1,5 +1,13 @@
 # Cambiamenti
 
+## Correzione degli asset della 2.0.0
+
+- Ripristinato `latest.yml` per le installazioni Electron della Suite: mancava
+  nella release e il controllo aggiornamenti terminava con HTTP 404.
+- La build Windows genera sempre il feed con dimensione e SHA-512
+  dell'installer reale. Una prova con electron-updater 6.8.9 verifica versione,
+  download, checksum e comando di installazione prima di creare gli artifact.
+
 ## 2.0.0 — DaProdGiochi
 
 - La suite diventa una sala giochi privata: rimossi i moduli creativi e i
