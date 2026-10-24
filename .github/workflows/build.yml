@@ -55,6 +55,13 @@ jobs:
         run: ./gradlew testReleaseUnitTest assembleRelease --no-daemon
       - name: Nome del pacchetto
         run: cp apps/mobile/app/build/outputs/apk/release/app-release.apk DaProdGiochi-telefono-2.0.0.apk
+      - name: Verifica continuità con l'APK reale 1.7.10
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 https://github.com/cammo22/DaProdGiochi/releases/download/v1.7.10/DaProdSuite-telefono-1.7.10.apk --output "$RUNNER_TEMP/suite-1.7.10.apk"
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          aapt=$(find "$ANDROID_HOME/build-tools" -name aapt | sort -V | tail -n 1)
+          python tests/android_upgrade.py "$signer" "$aapt" "$RUNNER_TEMP/suite-1.7.10.apk" DaProdGiochi-telefono-2.0.0.apk
       - uses: actions/upload-artifact@v4
         with:
           name: DaProdGiochi-Android
