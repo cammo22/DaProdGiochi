@@ -15,6 +15,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.lifecycleScope
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import it.daprod.suite.data.Profili
@@ -47,6 +50,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState)
         val root=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.rgb(18,21,21))}
+        WindowCompat.setDecorFitsSystemWindows(window,false)
+        ViewCompat.setOnApplyWindowInsetsListener(root){v,i->val bars=i.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);i}
         val bar=LinearLayout(this).apply {setPadding(12,6,12,6)}
         bar.addView(Button(this).apply {text="◈ Profili";setOnClickListener {profiles()}},LinearLayout.LayoutParams(0,52.dp,1f))
         bar.addView(Button(this).apply {text="↻ Riprova";setOnClickListener {Profili.attivo(this@MainActivity)?.let {open(it)} ?: profiles()}},LinearLayout.LayoutParams(0,52.dp,1f))

@@ -565,10 +565,13 @@ async fn action(State(s): State<AppState>, h: HeaderMap, Json(v): Json<Value>) -
         }
         _ => return Err(bad("Operazione sconosciuta")),
     };
-    tx.execute(
-        "INSERT INTO requests(player,key,body,response) VALUES(?1,?2,?3,?4)",
-        params![id, key, body, result.to_string()],
-    )?;
+    // Una stima frequente non è un movimento economico da conservare per sempre.
+    if operation != "estimate" {
+        tx.execute(
+            "INSERT INTO requests(player,key,body,response) VALUES(?1,?2,?3,?4)",
+            params![id, key, body, result.to_string()],
+        )?;
+    }
     tx.commit()?;
     Ok(Json(result))
 }
@@ -618,6 +621,15 @@ async fn save_game(State(s): State<AppState>, h: HeaderMap, Json(v): Json<Value>
         "INSERT OR IGNORE INTO game_saves(player,game,revision,payload) VALUES(?1,?2,0,'{}')",
         params![id, game],
     )?;
+    let (current_revision, current_payload): (i64, String) = tx.query_row(
+        "SELECT revision,payload FROM game_saves WHERE player=?1 AND game=?2",
+        params![id, game],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    // Una risposta persa può essere ritentata senza inventare un conflitto.
+    if current_revision == revision + 1 && current_payload == payload {
+        return Ok(Json(json!({"revision":current_revision})));
+    }
     if tx.execute("UPDATE game_saves SET revision=revision+1,payload=?4 WHERE player=?1 AND game=?2 AND revision=?3",params![id,game,revision,payload])?!=1{return Err(ApiError(StatusCode::CONFLICT,"Il gioco è stato salvato su un altro dispositivo. Torna in sala e riaprilo per caricare la copia del PC.".into()))}
     tx.commit()?;
     Ok(Json(json!({"revision":revision+1})))
@@ -1051,5 +1063,45 @@ mod tests {
                 "{path}"
             );
         }
+    }
+    #[tokio::test]
+    async fn saves_are_private_versioned_and_can_exceed_small_api_bodies() {
+        let r = room();
+        let (token, id) = guest(&r).await;
+        let mut start = op("open");
+        start["game"] = json!("dozer");
+        let (_, opened) = call(&r.app, "/api/action", &token, Some(start)).await;
+        let body = json!({"game":"dozer","session":opened["session"],"revision":0,"saved":{"daprod_dozer_v4":"x".repeat(30000)}});
+        assert_eq!(
+            call(&r.app, "/api/save", "owner-secret", Some(body.clone()))
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+        let (status, saved) = call(&r.app, "/api/save", &token, Some(body.clone())).await;
+        assert_eq!(status, StatusCode::OK, "{saved}");
+        assert_eq!(saved["revision"], 1);
+        assert_eq!(
+            call(&r.app, "/api/save", &token, Some(body.clone()))
+                .await
+                .0,
+            StatusCode::OK
+        );
+        let mut stale = body;
+        stale["saved"]["daprod_dozer_v4"] = json!("different");
+        assert_eq!(
+            call(&r.app, "/api/save", &token, Some(stale)).await.0,
+            StatusCode::CONFLICT
+        );
+        let payload: String =
+            r.db.lock()
+                .unwrap()
+                .query_row(
+                    "SELECT payload FROM game_saves WHERE player=?1",
+                    [id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+        assert!(payload.len() > 30000);
     }
 }

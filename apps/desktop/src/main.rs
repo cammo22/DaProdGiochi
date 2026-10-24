@@ -18,6 +18,14 @@ fn tailscale_base(port: u16) -> Option<String> {
     } else {
         "tailscale"
     };
+    let status = std::process::Command::new(command)
+        .args(["status", "--json"])
+        .output()
+        .ok()?;
+    let status: serde_json::Value = serde_json::from_slice(&status.stdout).ok()?;
+    if status["BackendState"].as_str() != Some("Running") {
+        return None;
+    }
     let out = std::process::Command::new(command)
         .args(["serve", "status", "--json"])
         .output()
@@ -31,7 +39,11 @@ fn tailscale_base(port: u16) -> Option<String> {
             return None;
         }
         let target = format!("http://127.0.0.1:{port}");
-        if web["Handlers"]["/"]["Proxy"].as_str() != Some(&target) {
+        if web["Handlers"]["/"]["Proxy"]
+            .as_str()
+            .map(|s| s.trim_end_matches('/'))
+            != Some(target.as_str())
+        {
             return None;
         }
         Some(format!("https://{}", host.strip_suffix(":443")?))
@@ -85,6 +97,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tailscale: ts.is_some(),
         data,
     };
+    #[cfg(feature = "desktop")]
+    let webview_data = state.data.join("webview");
     let router = server::router(state);
     let runtime = tokio::runtime::Runtime::new()?;
     let _service = runtime.spawn(async move {
@@ -105,6 +119,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tauri::WebviewUrl::External(url.parse()?),
                 )
                 .title("DaProdGiochi")
+                .data_directory(webview_data)
                 .inner_size(1280.0, 850.0)
                 .min_inner_size(850.0, 600.0)
                 .build()?;
